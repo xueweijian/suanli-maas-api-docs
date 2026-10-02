@@ -43,7 +43,7 @@ curl -s $BASE/chat/completions -H "Authorization: Bearer $SUANLI_API_KEY" \
 | `black-forest-labs/flux.1-krea-dev` | 文生图 | ❌ 404 | `POST /v1/images/generations` ✅ | 返回 `file://base64` PNG，慢（60s+），超时设 180s |
 | `stabilityai/stable-diffusion-3.5-medium` | 文生图 | ❌ 404 | `POST /v1/images/generations` ✅ | 同上 |
 | `qwen/qwen3-asr-1.7b` | ASR | ⚠️ 200 占位符 | `POST /v1/audio/transcriptions` ✅ | chat 回 `language None<asr_text>` 无用；转写端点 200，2s 音频回 `{"text":"","usage":{"seconds":2}}` |
-| `mineru/mineru2.5-pro-2604-1.2b` | OCR/文档解析 | ⚠️ 200 空 content | 专有端点未知 | chat 调通但无内容，勿用 chat |
+| `mineru/mineru2.5-pro-2604-1.2b` | VLM/文档解析 | ⚠️ 半可用 | chat（版面坐标可看不可用，详见[`docs/09-mineru.md`](docs/09-mineru.md)） | 无专有端点；`hi`回空，`Layout Detection`回坐标但特殊token被剥，真图0/6命中 |
 
 > ❌ body-400 指：HTTP 外层是 200，body 里是 `{"error":{"message":"The model does not support Chat Completions API","code":400}}`。
 > 判通不能只看状态码，详见 [`docs/08-gotchas.md`](docs/08-gotchas.md)。
@@ -58,6 +58,7 @@ curl -s $BASE/chat/completions -H "Authorization: Bearer $SUANLI_API_KEY" \
 - [`docs/06-audio.md`](docs/06-audio.md) —— ASR 转写接口
 - [`docs/07-models.md`](docs/07-models.md) —— 14 模型全矩阵 + `/v1/models` 原始字段
 - [`docs/08-gotchas.md`](docs/08-gotchas.md) —— 5 个坑（body-400 / 404 / 慢生图 / DNS 抖动 / App 缓存）
+- [`docs/09-mineru.md`](docs/09-mineru.md) —— mineru 端点深挖（无专有端点，半可用判定）
 
 ## 可运行示例
 

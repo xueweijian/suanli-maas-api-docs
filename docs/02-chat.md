@@ -1,6 +1,6 @@
 # 02 · 对话 `POST /v1/chat/completions`（OpenAI 兼容）
 
-7 个模型真通，2 个返回"假 200"（占位符/空内容，勿用）。
+7 个模型真通，1 个占位符（ASR），1 个半可用（mineru，见 [09 深挖](09-mineru.md)）。
 
 ## 真通的 7 个 LLM
 
@@ -57,9 +57,9 @@ print(r.choices[0].message.content)
  "param":"","code":"bad_response_status_code"}}
 ```
 
-## ⚠️ 2 个"假 200"（调得通但没用）
+## ⚠️ 1 个占位符 + 1 个半可用
 
 | 模型 | chat 返回 | 结论 |
 |---|---|---|
-| `qwen/qwen3-asr-1.7b` | `content: "language None<asr_text>"` | 占位符。真转写走 [`audio/transcriptions`](../06-audio.md)（已验证 200） |
-| `mineru/mineru2.5-pro-2604-1.2b` | `content: ""`（空） | OCR 模型，chat 无内容。专有解析端点未知，欢迎补充 |
+| `qwen/qwen3-asr-1.7b` | `content: "language None<asr_text>"` | 占位符。真转写走 [`audio/transcriptions`](06-audio.md)（已验证 200） |
+| `mineru/mineru2.5-pro-2604-1.2b` | `hi`→空；`Layout Detection`→坐标行（特殊 token 被剥）；真图 0/6 命中 | 半可用：无专有端点（7 路径全 404），版面可看不可用。全文见 [`09-mineru.md`](09-mineru.md) |

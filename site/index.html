@@ -27,7 +27,7 @@ footer{color:var(--mut);font-size:12.5px;margin-top:40px;border-top:1px solid va
 </head>
 <body>
 <nav><div class="wrap">
-<a href="#quick">速览</a><a href="#matrix">总表</a><a href="#chat">对话</a><a href="#emb">向量</a><a href="#rerank">排序</a><a href="#img">生图</a><a href="#asr">转写</a><a href="#gotchas">坑位</a><a href="#run">示例</a>
+<a href="#quick">速览</a><a href="#matrix">总表</a><a href="#chat">对话</a><a href="#emb">向量</a><a href="#rerank">排序</a><a href="#img">生图</a><a href="#asr">转写</a><a href="#mineru">MinerU</a><a href="#gotchas">坑位</a><a href="#run">示例</a>
 </div></nav>
 <div class="wrap">
 <header>
@@ -65,7 +65,7 @@ curl -s $BASE/chat/completions -H "Authorization: Bearer $SUANLI_API_KEY" \
 <tr><td><code>black-forest-labs/flux.1-krea-dev</code></td><td>生图</td><td class="bad">❌ 404</td><td><code>POST /v1/images/generations</code> <span class="ok">✅</span></td></tr>
 <tr><td><code>stabilityai/stable-diffusion-3.5-medium</code></td><td>生图</td><td class="bad">❌ 404</td><td><code>POST /v1/images/generations</code> <span class="ok">✅</span></td></tr>
 <tr><td><code>qwen/qwen3-asr-1.7b</code></td><td>ASR</td><td class="warn">⚠️ 假200占位符</td><td><code>POST /v1/audio/transcriptions</code> <span class="ok">✅</span></td></tr>
-<tr><td><code>mineru/mineru2.5-pro-2604-1.2b</code></td><td>OCR</td><td class="warn">⚠️ 假200空content</td><td>专有端点未知</td></tr>
+<tr><td><code>mineru/mineru2.5-pro-2604-1.2b</code></td><td>VLM解析</td><td class="warn">⚠️ 半可用</td><td>chat（版面可看不可用，见下）</td></tr>
 </table></div>
 
 <h2 id="chat">对话 <code>POST /v1/chat/completions</code></h2>
@@ -75,7 +75,7 @@ curl -s $BASE/chat/completions -H "Authorization: Bearer $SUANLI_API_KEY" \
        "messages":[{"role":"user","content":"hi"}],"max_tokens":32}'
 # → {"model":"DeepSeek-V4-Flash-0731","choices":[{"message":{"content":
 #    "Hello! How can I help you today?"},"finish_reason":"stop"}}],...}</pre>
-<div class="sub">mineru 用 chat 调回空 content；asr 回 <code>language None&lt;asr_text&gt;</code> 占位符——都是"假 200"，别用。embedding / rerank 吃 body-400，生图吃 404。</div></div>
+<div class="sub">asr 用 chat 调回 <code>language None&lt;asr_text&gt;</code> 占位符；mineru 无专有端点、版面坐标可看不可用（喂真图 0/6 命中）——都别当 LLM 用。embedding / rerank 吃 body-400，生图吃 404。</div></div>
 
 <h2 id="emb">向量 <code>POST /v1/embeddings</code></h2>
 <div class="card"><pre>curl -s $BASE/embeddings -H "Authorization: Bearer $SUANLI_API_KEY" \
@@ -113,6 +113,20 @@ open('cat.png','wb').write(base64.b64decode(d['data'][0]['url'].split('file://',
   -F model='qwen/qwen3-asr-1.7b' -F file=@voice.wav
 # → {"text":"...","usage":{"type":"duration","seconds":2}}</pre>
 <div class="sub">multipart 表单，16kHz 单声道 wav 最稳。合成 2s 正弦波实测 200（无语音故 text 为空，但 seconds=2 证明链路通）。</div></div>
+
+<h2 id="mineru">MinerU 深挖：无专有端点，半可用</h2>
+<div class="card">
+<b>结论：</b><code>mineru/mineru2.5-pro-2604-1.2b</code> 在 MaaS 上没有 <code>/file_parse</code> 类专有端点（7 个猜测路径全 404）。真身是 chat 里的 Qwen2-VL 模型，但网关剥掉特殊 token，版面坐标可看不可用。<br><br>
+<b>官方对照：</b>自部署 <code>mineru-api</code> 的 <code>/file_parse</code> 是另一套（弹性部署预制镜像）；VLM 本体走的正是 <code>/v1/chat/completions</code>（官方 <code>mineru-vl-utils http-client</code> 同款，图前文后）。<br><br>
+<b>三处对不上：</b>① <code>Layout Detection</code> 回坐标谱系但无 <code>&lt;|box_start|&gt;</code> 标记（<code>skip_special_tokens:false</code> 也救不回）；② 官方全套采样参数照抄无改善；③ 喂 1036×1036 真文档图，图中 6 个词 0 命中、类型永远 <code>text/header</code>。<br><br>
+<pre>curl -s $BASE/chat/completions -H "Authorization: Bearer $SUANLI_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"mineru/mineru2.5-pro-2604-1.2b",
+       "messages":[{"role":"system","content":"You are a helpful assistant."},
+                   {"role":"user","content":"\nLayout Detection:"}],
+       "max_tokens":512,"temperature":0.0}'
+# → "100 000 999 019header\n100 020 999 039header\n..."（511 字，全文见 assets/mineru_layout.json）</pre>
+<div class="sub">真要解析 PDF：走弹性部署预制 minerU 镜像（<code>/file_parse</code>）或 mineru.net 官方 API。全文见 <a href="https://github.com/xueweijian/suanli-maas-api-docs/blob/main/docs/09-mineru.md">docs/09-mineru.md</a>。</div></div>
 
 <h2 id="gotchas">坑位（5 个亲踩）</h2>
 <div class="card">

@@ -7,7 +7,7 @@ App 里显示的 11 个是旧缓存，refresh 后以这里为准。原文见 `as
 |---|---|---|---|
 | 1 | `black-forest-labs/flux.1-krea-dev` | image-generation, openai | 生图走 images ✅，chat 404 |
 | 2 | `deepseek/deepseek-v4-flash-0731-free` | openai | chat ✅ |
-| 3 | `mineru/mineru2.5-pro-2604-1.2b` | openai | chat 假 200（空 content）⚠️ |
+| 3 | `mineru/mineru2.5-pro-2604-1.2b` | openai | 半可用：无专有端点，版面可看不可用（见 [09-mineru.md](09-mineru.md)）⚠️ |
 | 4 | `minimax/minimax-m2.5-awq` | openai | chat ✅ |
 | 5 | `qwen/qwen3-32b` | openai | chat ✅ |
 | 6 | `qwen/qwen3-asr-1.7b` | openai | chat 假 200（占位符）⚠️；转写走 audio ✅ |
