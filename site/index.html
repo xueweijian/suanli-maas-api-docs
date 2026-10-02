@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>共绩算力 MaaS 实测文档 · api.suanli.cn/v1</title>
+<style>
+:root{--bg:#0f1115;--card:#171b22;--line:#262c38;--tx:#e8ecf1;--mut:#9aa4b2;--acc:#7cc4ff;--ok:#4ade80;--bad:#f87171;--warn:#fbbf24}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.7 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+.wrap{max-width:960px;margin:0 auto;padding:20px 16px 80px}
+header{padding:28px 0 8px}h1{font-size:24px;margin:.2em 0}h2{font-size:19px;margin:34px 0 10px;padding-top:18px;border-top:1px solid var(--line)}
+.sub{color:var(--mut)}.pill{display:inline-block;font-size:12px;border:1px solid var(--line);border-radius:99px;padding:2px 10px;margin:2px 4px 2px 0;color:var(--mut)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:10px 0}
+table{width:100%;border-collapse:collapse;font-size:13.5px}.th,.td{text-align:left;padding:8px;border-bottom:1px solid var(--line)}
+th{color:var(--mut);font-weight:600}code{background:#0b0e13;border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-size:13px;word-break:break-all}
+pre{background:#0b0e13;border:1px solid var(--line);border-radius:10px;padding:12px;overflow:auto;font-size:12.5px;line-height:1.6}
+.ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+nav{position:sticky;top:0;background:rgba(15,17,21,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);z-index:5}
+nav .wrap{padding:10px 16px;display:flex;gap:14px;overflow-x:auto;font-size:13px;white-space:nowrap}
+nav a{color:var(--acc);text-decoration:none}
+img.sample{max-width:100%;border-radius:12px;border:1px solid var(--line)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+a{color:var(--acc)}
+footer{color:var(--mut);font-size:12.5px;margin-top:40px;border-top:1px solid var(--line);padding-top:14px}
+@media(max-width:640px){table{font-size:12px}}
+</style>
+</head>
+<body>
+<nav><div class="wrap">
+<a href="#quick">速览</a><a href="#matrix">总表</a><a href="#chat">对话</a><a href="#emb">向量</a><a href="#rerank">排序</a><a href="#img">生图</a><a href="#asr">转写</a><a href="#gotchas">坑位</a><a href="#run">示例</a>
+</div></nav>
+<div class="wrap">
+<header>
+<h1>共绩算力 MaaS 实测文档</h1>
+<div class="sub"><code>https://api.suanli.cn/v1</code> · 第三方实测（非官方）· 快照 2026-10-02 · 共 14 个模型 · 官方文档只讲 chat，这里补全 embedding / rerank / 生图 / ASR</div>
+<div style="margin-top:10px">
+<span class="pill">OpenAI 兼容</span><span class="pill">7 LLM ✅ chat</span><span class="pill">向量 2560 / 4096 维</span><span class="pill">生图 file://base64</span><span class="pill">Key: maas.suanli.cn/api-keys</span>
+</div>
+</header>
+
+<h2 id="quick">30 秒速览</h2>
+<div class="card"><pre>export SUANLI_API_KEY='你的 MaaS Key'
+export BASE='https://api.suanli.cn/v1'
+# 模型清单（14 个）
+curl -s $BASE/models -H "Authorization: Bearer $SUANLI_API_KEY" | python3 -c \
+  "import sys,json; [print(m['id']) for m in json.load(sys.stdin)['data']]"
+# 对话
+curl -s $BASE/chat/completions -H "Authorization: Bearer $SUANLI_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"deepseek/deepseek-v4-flash-0731-free","messages":[{"role":"user","content":"hi"}],"max_tokens":32}'</pre></div>
+
+<h2 id="matrix">模型 × 端点总表（全部实测）</h2>
+<div class="card" style="overflow-x:auto"><table>
+<tr><th>模型</th><th>类型</th><th>chat</th><th>正确端点</th></tr>
+<tr><td><code>deepseek/deepseek-v4-flash-0731-free</code></td><td>LLM</td><td class="ok">✅ 通</td><td>chat</td></tr>
+<tr><td><code>minimax/minimax-m2.5-awq</code></td><td>LLM</td><td class="ok">✅ 通</td><td>chat</td></tr>
+<tr><td><code>qwen/qwen3-32b</code></td><td>LLM</td><td class="ok">✅ 通</td><td>chat</td></tr>
+<tr><td><code>qwen/qwen3.8-27b</code></td><td>LLM</td><td class="ok">✅ 通</td><td>chat</td></tr>
+<tr><td><code>qwen/qwen3-omni-30b-a3b-instruct</code></td><td>多模态</td><td class="ok">✅ 通</td><td>chat</td></tr>
+<tr><td><code>qwen/qwen3-vl-30b-a3b-instruct</code></td><td>视觉</td><td class="ok">✅ 通</td><td>chat</td></tr>
+<tr><td><code>qwen/qwen3-vl-32b-instruct</code></td><td>视觉</td><td class="ok">✅ 通</td><td>chat（偶发超时，重试）</td></tr>
+<tr><td><code>qwen/qwen3-embedding-4b</code></td><td>向量</td><td class="bad">❌ body-400</td><td><code>POST /v1/embeddings</code> <span class="ok">✅ 2560维</span></td></tr>
+<tr><td><code>qwen/qwen3-embedding-8b</code></td><td>向量</td><td class="bad">❌ body-400</td><td><code>POST /v1/embeddings</code> <span class="ok">✅ 4096维</span></td></tr>
+<tr><td><code>qwen/qwen3-reranker-8b</code></td><td>排序</td><td class="bad">❌ body-400</td><td><code>POST /v1/rerank</code> <span class="ok">✅</span></td></tr>
+<tr><td><code>black-forest-labs/flux.1-krea-dev</code></td><td>生图</td><td class="bad">❌ 404</td><td><code>POST /v1/images/generations</code> <span class="ok">✅</span></td></tr>
+<tr><td><code>stabilityai/stable-diffusion-3.5-medium</code></td><td>生图</td><td class="bad">❌ 404</td><td><code>POST /v1/images/generations</code> <span class="ok">✅</span></td></tr>
+<tr><td><code>qwen/qwen3-asr-1.7b</code></td><td>ASR</td><td class="warn">⚠️ 假200占位符</td><td><code>POST /v1/audio/transcriptions</code> <span class="ok">✅</span></td></tr>
+<tr><td><code>mineru/mineru2.5-pro-2604-1.2b</code></td><td>OCR</td><td class="warn">⚠️ 假200空content</td><td>专有端点未知</td></tr>
+</table></div>
+
+<h2 id="chat">对话 <code>POST /v1/chat/completions</code></h2>
+<div class="card"><pre>curl -s $BASE/chat/completions -H "Authorization: Bearer $SUANLI_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"deepseek/deepseek-v4-flash-0731-free", \
+       "messages":[{"role":"user","content":"hi"}],"max_tokens":32}'
+# → {"model":"DeepSeek-V4-Flash-0731","choices":[{"message":{"content":
+#    "Hello! How can I help you today?"},"finish_reason":"stop"}}],...}</pre>
+<div class="sub">mineru 用 chat 调回空 content；asr 回 <code>language None&lt;asr_text&gt;</code> 占位符——都是"假 200"，别用。embedding / rerank 吃 body-400，生图吃 404。</div></div>
+
+<h2 id="emb">向量 <code>POST /v1/embeddings</code></h2>
+<div class="card"><pre>curl -s $BASE/embeddings -H "Authorization: Bearer $SUANLI_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"qwen/qwen3-embedding-8b","input":"hello"}'
+# → {"model":"Qwen3-Embedding-8B","data":[{"embedding":[...4096 维...]}],
+#    "usage":{"prompt_tokens":2,"total_tokens":2}}</pre>
+<div class="sub">4b = 2560 维，8b = 4096 维。OpenAI SDK 的 <code>client.embeddings.create</code> 直连可用。</div></div>
+
+<h2 id="rerank">排序 <code>POST /v1/rerank</code></h2>
+<div class="card"><pre>curl -s $BASE/rerank -H "Authorization: Bearer $SUANLI_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"qwen/qwen3-reranker-8b","query":"cat", \
+       "documents":["a cat","a dog"]}'
+# → {"results":[
+#   {"index":0,"relevance_score":0.2114,...},  # a cat
+#   {"index":1,"relevance_score":0.1017,...}]}</pre>
+<div class="sub">别写成 <code>/v1/v1/rerank</code>（base 已含 /v1）。</div></div>
+
+<h2 id="img">生图 <code>POST /v1/images/generations</code></h2>
+<div class="card"><pre># 很慢！超时至少 180s
+curl -s --max-time 180 $BASE/images/generations \
+  -H "Authorization: Bearer $SUANLI_API_KEY" -H 'Content-Type: application/json' \
+  -d '{"model":"black-forest-labs/flux.1-krea-dev", \
+       "prompt":"a small orange cat sitting on a wooden table, photorealistic"}' -o flux.json
+python3 -c "import json,base64;d=json.load(open('flux.json')); \
+open('cat.png','wb').write(base64.b64decode(d['data'][0]['url'].split('file://',1)[1]))"
+# → {"created":...,"data":[{"url":"file://iVBOR..."}]}  # base64 PNG 1024×1024</pre>
+<div class="sub">flux 与 SD3.5 行为一致。样张（prompt 见上）：</div>
+<img class="sample" src="assets/flux_sample.png" alt="flux 实测样张：橘猫"></div>
+
+<h2 id="asr">转写 <code>POST /v1/audio/transcriptions</code></h2>
+<div class="card"><pre>curl -s --max-time 120 $BASE/audio/transcriptions \
+  -H "Authorization: Bearer $SUANLI_API_KEY" \
+  -F model='qwen/qwen3-asr-1.7b' -F file=@voice.wav
+# → {"text":"...","usage":{"type":"duration","seconds":2}}</pre>
+<div class="sub">multipart 表单，16kHz 单声道 wav 最稳。合成 2s 正弦波实测 200（无语音故 text 为空，但 seconds=2 证明链路通）。</div></div>
+
+<h2 id="gotchas">坑位（5 个亲踩）</h2>
+<div class="card">
+<b>1. 业务拒绝藏 body 里：</b>embedding / rerank 用错端点时 HTTP 仍 200，error 在 body（code 400）。判通 = 有 choices/data/results 且无 error。<br>
+<b>2. 生图 chat 直接 404：</b>别重试，换 images 端点。<br>
+<b>3. 生图很慢：</b>60s+ 才回包，超时设 180s。<br>
+<b>4. 间歇 DNS 抖动：</b><code>Errno -3 Try again</code>，重试 2-3 次即过。<br>
+<b>5. App 列表缓存：</b>App 显示 11 个是旧的，线上 14 个，refresh 为准。
+</div>
+
+<h2 id="run">可运行示例</h2>
+<div class="card"><pre>pip install openai   # 或全用标准库，见 examples/
+python3 examples/models_list.py
+python3 examples/chat.py
+python3 examples/embeddings.py
+python3 examples/rerank.py
+python3 examples/images.py            # 约 60-120s → cat.png
+python3 examples/audio_transcribe.py  # 自带合成测试音</pre>
+<div class="sub">GitHub 仓库：docs/ 是 Markdown 原文，examples/ 是 6 个零依赖脚本，assets/ 是真实响应快照 + 生图样张。</div></div>
+
+<footer>第三方实测记录，与共绩算力官方无关 · 快照 2026-10-02 · 模型上下线频繁，以 <code>GET /v1/models</code> 线上为准 · 欢迎 PR（附脱敏响应体）</footer>
+</div>
+</body>
+</html>
